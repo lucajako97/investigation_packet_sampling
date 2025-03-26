@@ -1,9 +1,4 @@
 /*
-To compile the user space program
-gcc -o user_space_reader.o user_space_reader.c -lbpf
-./user_space_reader.o
-
-
 To compile the eBPF program
 clang -O2 -g -target bpf -c ringbuf_kern.c -o ringbuf_kern.o
 bpftool prog load ringbuf_kern.o /sys/fs/bpf/my_prog
@@ -87,7 +82,7 @@ struct packet_infos_and_features_t {
 
 static struct packet_infos_and_features_t my_info_feature;
 
-// callback function to handle the upcoming event
+// Callback function to handle the upcoming event
 static int handle_event(void *ctx, void *data, size_t data_sz) {
     
     struct packet_infos_and_features_t *e = (struct packet_infos_and_features_t *)data;
@@ -101,17 +96,9 @@ static int handle_event(void *ctx, void *data, size_t data_sz) {
 }
 
 int main() {
-    /*
-    struct sched_param param;
-    param.sched_priority = 99;  // Max priority
 
-    if (sched_setscheduler(0, SCHED_FIFO, &param) < 0) {
-        printf("sched_setscheduler failed: %s\n", strerror(errno));
-    } else {
-        printf("Real-time priority set!\n");
-    }
-    */
-    int map_id = 2453; // sudo bpftool map show | grep ringbuf
+    // mad id to be inserted every time the eBPF program is rerun
+    int map_id = 44; // sudo bpftool map show | grep ringbuf
     int map_fd = -1;
     struct ring_buffer *rb;
 
@@ -121,6 +108,7 @@ int main() {
         fprintf(stderr, "Failed to find map: %s\n", strerror(-map_fd));
         return 1;
     }
+
     // Create a ring buffer consumer
     rb = ring_buffer__new(map_fd, handle_event, NULL, NULL);
     if (!rb) {
@@ -139,6 +127,7 @@ int main() {
         }
     }
 
+    // Clean the ring buffer
     ring_buffer__free(rb);
     return 0;
 }

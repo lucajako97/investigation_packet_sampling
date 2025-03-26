@@ -181,7 +181,7 @@ def callback(ctx, data, size):
         callback_features.append(pkt.all_packet_features.packet_features[i].channel_2D.corr_coeff)
 
 #name of eBPF program to compile
-ebpf_program = "xdp_features_ring_kitnet.c"
+ebpf_program = "xdp_features.c"
 
 # Load BPF program
 b = BPF(src_file=ebpf_program)
@@ -189,88 +189,26 @@ b = BPF(src_file=ebpf_program)
 # Attach eBPF program to eXpress Data Path ingress hook
 fn = b.load_func("xdp_ingress", BPF.XDP)
 
-iface = "enp3s0"  # Dedicated network interface
+iface = "enp2s0f0np0"  # Dedicated network interface
 b.attach_xdp(dev=iface, fn=fn, flags=0)
 
 print("Attached BPF to interface: %s" % iface)
-kitsune = Kitsune(featuresNumber,maxAE,FMgrace,ADgrace)
-print("\033[38;5;214mKitNET is started🦊\033[0m")
-
-start_time = time.time()
-end_time = 0
-
 ring = b.get_table("packet_and_features_ring")
 
 ring.open_ring_buffer(callback)
 print("Ring buffer is open!")
 
 try:
-    counter = 0
     while True:
-        '''
         time.sleep(1000000)
-        '''
-        # Computes the RMSE for the given feature vector
-        b.ring_buffer_poll()
-
-        while len(callback_packet) >= 6:
-            counter += 1
-            #if counter % 10000 == 0:
-            #    print(f"Features extracted {counter}", end='\n\n\n')
-            #rmse = kitsune.process_featureVector(callback_features[:100])
-            #rmse = 0 #just for performance test
-            #if rmse == -1:
-            #    break
-            #RMSEs.append(rmse)
-            #list_of_packets.append(copy.deepcopy(callback_packet[:6]))
-
-            callback_packet = callback_packet[6:]
-            callback_features = callback_features[100:]
-        #'''
-    
+ 
 
 except Exception as e:
     print(f"{e}")
     traceback.print_exc()
-    end_time = time.time()
-    print("\nRing buffer is closed now...\n")    
-    print(f"Packet counted = {counter}")
+    print("\nRing buffer is closed now...\n")
 
 finally:
     # Detach the eBPF program on exit
     b.remove_xdp(dev=iface, flags=0)
     print(f"Detached BPF program from interface: {iface}")
-    print(f"Packet counted = {counter}")
-    print(len(RMSEs), end="\n\n\n")
-    #print(RMSEs)
-
-    # Visualizes the output of the neural network
-    # Fit the RMSE scores to a log-normal distribution
-    benignSample = numpy.log(RMSEs[FMgrace+ADgrace+1:])
-    logProbs = norm.logsf(numpy.log(RMSEs), numpy.mean(benignSample), numpy.std(benignSample))
-    plt.figure(figsize=(10,5))
-    fig = plt.scatter(range(FMgrace+ADgrace+1,len(RMSEs)),RMSEs[FMgrace+ADgrace+1:],s=0.1,c=logProbs[FMgrace+ADgrace+1:],cmap='RdYlGn')
-    plt.yscale("log")
-    plt.title("Anomaly Scores from Kitsune's Execution Phase")
-    plt.ylabel("RMSE (log scaled)")
-    plt.xlabel("Time elapsed [min]")
-    figbar=plt.colorbar()
-    figbar.ax.set_ylabel('Log Probability\n ', rotation=270)
-    plt.savefig("anomaly_score.png", dpi=300, transparent=False)
-    #plt.show()
-
-    '''
-    my_counter = 0
-    for pkt in list_of_packets:
-        if len(pkt) > 6:
-            my_counter += int(len(pkt)/6 - 1)
-            print(pkt, end="\n\n")
-    percentage = 1 - ((counter-my_counter)/counter)
-    percentage = percentage * 100
-    per_mille = percentage * 10
-    print(f"Total packets processed: {counter}")
-    print(f"Packets not counted: {my_counter}")
-    print(f"Total packets: {counter+my_counter}")
-    print(f"Packet Loss: {percentage}%")
-    print(f"Packet Loss: {per_mille}‰")
-    '''

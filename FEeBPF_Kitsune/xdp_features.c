@@ -1,7 +1,7 @@
 //#include <bcc/proto.h>      // for BCC framework
 //#include </usr/lib/x86_64-linux-gnu/perl/5.34.0/CORE/proto.h>
 //#include </usr/src/linux-headers-5.15.0-116/arch/x86/include/asm/proto.h>
-#include </usr/src/linux-hwe-6.8-headers-6.8.0-49/arch/x86/include/asm/proto.h>
+#include </usr/src/linux-hwe-6.8-headers-6.8.0-52/arch/x86/include/asm/proto.h>
 //#include </usr/include/bpf/bpf.h>
 #include </usr/src/linux-hwe-6.8-headers-6.8.0-52/include/uapi/linux/bpf.h>
 //#include <uapi/linux/bpf.h> // to handle bpf calls from userspace
@@ -1034,18 +1034,8 @@ int xdp_ingress(struct xdp_md *ctx){
         }
     }
 
-    struct packet_infos_and_features_t *entry = packet_and_features_ring.ringbuf_reserve(sizeof(struct packet_infos_and_features_t));
-
-    if (!entry){
-        bpf_trace_printk("Not able to store the packet and its features in our ring buffer");
-        return XDP_DROP;
-    }
-
-    
-    __builtin_memcpy(entry, my_final_package, sizeof(struct packet_infos_and_features_t));
-    packet_and_features_ring.ringbuf_submit(entry, 0);
-
     //if (packet_number->counter % 1000000 == 0)
     //    bpf_trace_printk("Counter: %d\n", packet_number->counter);
+
     return XDP_PASS;   // We don't care about the packet
 }

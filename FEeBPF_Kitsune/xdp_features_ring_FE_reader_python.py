@@ -14,6 +14,8 @@ from scipy.stats import norm
 from matplotlib import pyplot as plt
 import traceback
 import copy
+import queue
+import threading
 
 # the number of temporal frame considered
 my_lambdas = 5
@@ -114,6 +116,7 @@ def int_to_mac_address(integer):
 def callback(ctx, data, size):
     pkt = b.get_table("packet_and_features_ring")
     pkt = cast(data, POINTER(FinalPacket)).contents
+    #pkt = copy.deepcopy(pkt)
     # The pkt sampling policy will be applied here detecting if
     # this pkt can be analysed or not
     '''
@@ -178,7 +181,7 @@ def callback(ctx, data, size):
         callback_features.append(pkt.all_packet_features.packet_features[i].channel_2D.corr_coeff)
 
 #name of eBPF program to compile
-ebpf_program = "xdp_features_ring_kitnet.c"
+ebpf_program = "xdp_features_ring.c"
 
 # Load BPF program
 b = BPF(src_file=ebpf_program)
@@ -186,12 +189,10 @@ b = BPF(src_file=ebpf_program)
 # Attach eBPF program to eXpress Data Path ingress hook
 fn = b.load_func("xdp_ingress", BPF.XDP)
 
-iface = "enp3s0"  # Dedicated network interface
+iface = "enp2s0f0np0"  # Dedicated network interface
 b.attach_xdp(dev=iface, fn=fn, flags=0)
 
 print("Attached BPF to interface: %s" % iface)
-kitsune = Kitsune(featuresNumber,maxAE,FMgrace,ADgrace)
-print("\033[38;5;214mKitNET is started🦊\033[0m")
 
 start_time = time.time()
 end_time = 0
@@ -204,70 +205,23 @@ print("Ring buffer is open!")
 try:
     counter = 0
     while True:
-        #time.sleep(660)
-        # Computes the RMSE for the given feature vector
+
         b.ring_buffer_poll()
-        counter += 1
-        print(f"Features extracted {counter}", end='\n\n\n')
-        #rmse = kitsune.process_featureVector(callback_features)
-        rmse = 0
-        if rmse == -1:
-            break
-        RMSEs.append(rmse)
-        list_of_packets.append(copy.deepcopy(callback_packet))
-        callback_features.clear()
-        callback_packet.clear()
-        
+
+        while len(callback_packet) >= 6:
+            counter += 1
+            list_of_packets.append(copy.deepcopy(callback_packet[:6]))
+            callback_packet = callback_packet[6:]
+            callback_features = callback_features[100:]
+    
 
 except Exception as e:
     print(f"{e}")
     traceback.print_exc()
-    end_time = time.time()
-    print("\nRing buffer is closed now...\n")    
-    print(f"Packet counted = {counter}")
+    print("\nRing buffer is closed now...\n")
 
 finally:
     # Detach the eBPF program on exit
     b.remove_xdp(dev=iface, flags=0)
     print(f"Detached BPF program from interface: {iface}")
-    print(f"Total time: {end_time - start_time}")
-    # Visualizes the output of the neural network
-    # Fit the RMSE scores to a log-normal distribution
-    benignSample = numpy.log(RMSEs[FMgrace+ADgrace+1:])
-    logProbs = norm.logsf(numpy.log(RMSEs), numpy.mean(benignSample), numpy.std(benignSample))
-    plt.figure(figsize=(10,5))
-    fig = plt.scatter(range(FMgrace+ADgrace+1,len(RMSEs)),RMSEs[FMgrace+ADgrace+1:],s=0.1,c=logProbs[FMgrace+ADgrace+1:],cmap='RdYlGn')
-    plt.yscale("log")
-    plt.title("Anomaly Scores from Kitsune's Execution Phase")
-    plt.ylabel("RMSE (log scaled)")
-    plt.xlabel("Time elapsed [min]")
-    figbar=plt.colorbar()
-    figbar.ax.set_ylabel('Log Probability\n ', rotation=270)
-    plt.savefig("anomaly_score.png", dpi=300, transparent=False)
-    #plt.show()
-
-    #print(RMSEs[FMgrace+ADgrace+1:])
-    minimum = min(RMSEs[FMgrace+ADgrace+1:])
-    maximum = max(RMSEs[FMgrace+ADgrace+1:])
-    threshold = (maximum - minimum)/2
-    print(f"threshold: {threshold}")
-
-    for rmse in RMSEs:
-        packet_label.append(0) if rmse < threshold else packet_label.append(1)
-
-    #packet_label.append(int(0) if rmse < threshold else int(1) for rmse in RMSEs)
-    print(len(packet_label), len(list_of_packets))
-    #print(list_of_packets)
-    print("\n\n\n\n")
-
-    for i in range(0,len(list_of_packets)):
-        list_of_packets[i].append(packet_label[i])
-
-    print("\n\n\n\n")
-    #print(list_of_packets[0])
-
-    my_counter = 0
-    for pkt in list_of_packets:
-        if len(pkt) > 7:
-            my_counter += 1
-    print(my_counter)
+    print(f"Packet counted = {counter}")

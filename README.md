@@ -1,12 +1,13 @@
 # An Investigation on packet sampling
 
-In this repo there is the code used in the research paper "An Investigation on Packet Sampling between Kernel and User Space for NIDS" for testing the performance of a considered kernel-to-user-space pipeline.
+In this repo there is the code used in the research work "An Investigation on Packet Sampling between Kernel and User Space for NIDS" for testing the performance of a considered kernel-to-user-space pipeline.
 
 ## Testbed
 
-The PCs are two Lenovo ThinkCentre M720t with an Intel Core i5-8400 hexa-core CPU with a frequency of 2.8 GHz, working in an architecture x86 at 64 bits, 6 cores per socket, 1 thread per core, and a RAM of 32 GB. They mount Ubuntu 22.04.5 LTS as OS with a 6.8.0-52-generic kernel. The peer-to-peer link is a Gigabit connection.
+The testbed is composed by two back-to-back connected programmable firewalls.
+These are two Protectli VP6650 with a Intel Core i5-1235U twelve-core CPU with a maximum frequency of 4.4GHz, working in an architecture x86 at 64 bits, 10 cores per socket, 2 threads per core, and a RAM of 64 GB. They mount Ubuntu 22.04.5 LTS as OS with a 6.8.0-52-generic kernel.
 
-(ongoing: The programmable firewalls are two Protectli VP6650 with a Intel Core i5-1235U twelve-core CPU with a maximum frequency of 4.4GHz, working in an architecture x86 at 64 bits, 10 cores per socket, 2 threads per core, and a RAM of 64 GB. They mount Ubuntu 22.04.5 LTS as OS with a 6.8.0-52-generic kernel. The peer-to-peer link is a 10 Gigabit/s connection)
+The tests are performed leveraging on the 10 Gb/s interfaces of the machines.
 
 ## Requirements
 
@@ -49,7 +50,7 @@ sudo apt install libbpf-dev
 
 This procedure MUST be executed in this exact order!
 
-The first step is to run the eBPF loader written in Python with one of these two commands, depending on which part of the pipeline you want to test (only the feature extractor, the features reader written in Python, and kitnet with the complete pipeline on):
+The first step is to run the eBPF loader written in Python with one of these commands, depending on which part of the pipeline you want to test (only the feature extractor, the feature reader written in Python, and kitnet with the complete pipeline on):
 
 ```
 sudo python3 xdp_features_FE.py
@@ -87,20 +88,19 @@ sudo bpftool map show | grep packet_and_feat
 // obtaining a similar result:
 // map_id: ringbuf  name packet_and_feat  flags 0x0
 
-// to compile the reader in C after having inserted the map id
+// to compile the reader in C after having inserted the map id inside the feature reader code
 gcc features_reader.c -o features_reader.o -lbpf
 
 // execute the reader
-./features_reader.o
+sudo ./features_reader.o
 ```
 
-and then you need to start the server and client with iperf3.
+and then you need to start the server and client iperf3.
 
 
 ### eBPF debugging
 
-We are using the BCC toolkit in python which is helping us to compile the eBPF program, to attach and deattach it to the XDP hook, and to load the maps into the user space.
-
+We are using the BCC toolkit in python which is helping us to compile the eBPF program, to attach and deattach it to the XDP hook, and to load the maps.
 To check if an eBPF print statement is working, you need to read the kernel's trace buffer. The easiest way to do this is by using the trace_pipe file located in the /sys/kernel/debug/tracing directory with this comand:
 
 ```
@@ -108,3 +108,8 @@ sudo cat /sys/kernel/debug/tracing/trace_pipe
 ```
 
 The trace_pipe file will continuously show any new prints from the kernel's trace buffer, so you can keep it open while your eBPF program processes packets.
+
+
+### Results
+
+The measurementes can be find at this [zenodo repository](https://doi.org/10.5281/zenodo.15114195).
